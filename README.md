@@ -1,14 +1,26 @@
 # slack-watcher
 
-A personal Slack → Claude Code automation daemon. It watches Slack for messages that need you and turns them into work:
+A personal Slack → Claude Code automation daemon. It watches Slack for messages that need you and turns them into work.
 
-- **Code request** (bug fix / feature aimed at you) → spawns a headless [Claude Code](https://claude.com/claude-code) worker in a **disposable git worktree**, which implements the change, runs tests/lint, and opens a **draft PR** targeting your integration branch.
-- **PR review request** (a mention with a PR link, or any teammate sharing a PR link asking for review) → reviews the PR and posts **inline comments on the exact changed lines** under your GitHub account (real bugs only — minor nits skipped; every comment includes a ```suggestion``` block or fix snippet; short, plain English). Then replies in the Slack thread that comments were added.
-- **Question** → drafts an answer (with your repos as context) and DMs it to you privately. You review and paste — it never answers anyone directly.
-- **Vague request** → DMs you 1-3 ready-to-send clarifying questions instead of guessing.
-- **FYI / social mention** → ignored.
+## Features
 
-No admin rights, no Slack app installation to the workspace, no always-on server needed: it polls Slack search with your own user token (near real-time, default 45 s) and runs on your machine via launchd (macOS), starting at login and auto-restarting.
+| Incoming message | What the watcher does |
+|---|---|
+| "@you fix the price filter on the listing page" | Spawns a headless [Claude Code](https://claude.com/claude-code) worker in a **disposable git worktree** → implements the fix → runs tests/lint → opens a **draft PR** targeting your integration branch |
+| "Please review this PR: github.com/…/pull/123" (mention optional) | Reviews the PR → posts **inline comments on the exact changed lines** with ```suggestion``` blocks (real bugs only, minor nits skipped, plain English) → replies in the Slack thread |
+| "@you when do we deploy?" | Drafts an answer using your repos/docs as context → DMs it to you privately — you review and paste |
+| "@you fix the bug" (too vague) | DMs you 1-3 ready-to-send clarifying questions instead of guessing |
+| "thanks @you!" / FYI / status update | Ignored — nothing happens |
+
+Built-in guardrails and quality-of-life:
+
+- **Near real-time without a server or admin rights** — polls Slack search with your own user token (default 45 s); no Slack app install to the workspace, runs on your machine via launchd (starts at login, auto-restarts).
+- **Reads the whole conversation** — pulls the thread or nearby messages, so requests split across several short messages are understood as one.
+- **Grace window** — DMs you "starting in N min, reply `stop` to cancel" before doing anything, so you and the bot never do the same task twice.
+- **Duplicate-work check** — scans open PRs, recent commits, and thread replies before writing code; never reviews its own or already-reviewed PRs.
+- **Your working copy is sacred** — workers only ever touch throwaway worktrees; drafts only; nothing public without the grace gate.
+- **Full visibility** — stage-by-stage DMs, streamed worker progress in the console log, and a `history.jsonl` audit trail.
+- **Manual send CLI** — fire off the drafted replies (or anything) to a channel or DM in one command.
 
 ## Requirements
 
