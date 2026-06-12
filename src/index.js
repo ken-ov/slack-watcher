@@ -32,9 +32,22 @@ function mergeMatches(mentionMatches, prMatches) {
   return [...merged.values()];
 }
 
+/** True when the user already posted something in the conversation after the mention — they handled it themselves. */
+function userAlreadyReplied(context, mention, selfId) {
+  return context.messages.some(
+    (m) => m.user === selfId && Number.parseFloat(m.ts) > Number.parseFloat(mention.ts),
+  );
+}
+
 async function processMention(mention, repos, config, slack, selfId) {
   const context = await slack.fetchContext(mention, config.contextWindowSeconds);
   if (context.error) log(`context unavailable for ${mentionKey(mention)}: ${context.error}`);
+
+  if (userAlreadyReplied(context, mention, selfId)) {
+    log(`mention ${mentionKey(mention)} → skipped, you already replied in the conversation`);
+    return { classification: { kind: "skipped" }, result: { status: "user_already_replied" } };
+  }
+
   const contextBlock = formatConversationContext(context, mention, selfId);
 
   const classification = await classifyMention(mention, repos, config, contextBlock);

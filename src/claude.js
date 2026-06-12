@@ -47,7 +47,12 @@ export function runClaude({ bin, prompt, cwd, timeoutMs, model, extraArgs = [], 
 
     const handleEvent = (event) => {
       if (event.type === "result") {
+        // The result event is final — settle NOW instead of waiting for process
+        // close, which can lag minutes if the worker left children holding the pipe.
         result = event.result ?? "";
+        clearTimeout(timer);
+        resolve(result);
+        child.kill();
         return;
       }
       if (!label || event.type !== "assistant") return;
