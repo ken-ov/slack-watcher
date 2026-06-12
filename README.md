@@ -111,6 +111,10 @@ Handlers share one signature: `handle(ctx)` with `ctx = { mention, classificatio
 - Leftover worktrees after a crash: `git -C <repo> worktree list`, then `git worktree remove --force <path>`.
 - Log timestamps are UTC+7 by default — change `UTC_OFFSET_HOURS` in `src/log.js`.
 
+## Disclaimer
+
+This tool automates real actions under your identity — draft PRs, review comments, and drafted replies. However, we still recommend that users review and take ownership of the messages before sending them, rather than relying entirely on the AI-generated response.
+
 ## License
 
 MIT
