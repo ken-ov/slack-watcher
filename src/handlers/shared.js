@@ -16,6 +16,28 @@ export function threadTsOf(mention) {
   return mention.permalink?.match(/thread_ts=(\d+\.\d+)/)?.[1] ?? mention.ts;
 }
 
+/**
+ * While a worker runs, poll the self-DM for a "stop" reply and abort the
+ * controller when one arrives — lets the user kill a running Claude session.
+ * Returns a cleanup function; always call it when the worker settles.
+ */
+export function watchForStop(ctx, dmChannel, label, controller, intervalMs = 20_000) {
+  const since = Date.now() / 1000;
+  const timer = setInterval(async () => {
+    try {
+      const replies = await ctx.slack.fetchMessagesSince(dmChannel, since);
+      if (replies.some((m) => STOP_REPLY.test((m.text ?? "").trim()))) {
+        log(`[${label}] stop received — killing the running worker`);
+        clearInterval(timer);
+        controller.abort();
+      }
+    } catch {
+      // transient Slack error — try again next tick
+    }
+  }, intervalMs);
+  return () => clearInterval(timer);
+}
+
 /** Wait out the grace window; true = user replied "stop" in the self-DM and the task must be dropped. */
 export async function cancelledDuringGrace(ctx, dmChannel, label) {
   const { config, slack, selfId, mention } = ctx;

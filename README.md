@@ -16,7 +16,7 @@ Built-in guardrails and quality-of-life:
 
 - **Near real-time without a server or admin rights** — polls Slack search with your own user token (default 45 s); no Slack app install to the workspace, runs on your machine via launchd (starts at login, auto-restarts).
 - **Reads the whole conversation** — pulls the thread or nearby messages, so requests split across several short messages are understood as one.
-- **Grace window** — DMs you "starting in N min, reply `stop` to cancel" before doing anything, so you and the bot never do the same task twice.
+- **Grace window + kill switch** — DMs you "starting in N min, reply `stop` to cancel" before doing anything; replying `stop` also works **while the worker runs** (checked every 20 s) and kills the Claude session immediately, discarding the worktree.
 - **Duplicate-work check** — scans open PRs, recent commits, and thread replies before writing code; never reviews its own or already-reviewed PRs.
 - **Your working copy is sacred** — workers only ever touch throwaway worktrees; drafts only; nothing public without the grace gate.
 - **Full visibility** — stage-by-stage DMs, streamed worker progress in the console log, and a `history.jsonl` audit trail.

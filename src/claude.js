@@ -12,7 +12,14 @@ function summarizeInput(input = {}) {
  * With `label` set, streams live progress (tool calls + narration) to the console log;
  * without it (e.g. the classifier) the run is silent.
  */
-export function runClaude({ bin, prompt, cwd, timeoutMs, model, extraArgs = [], label }) {
+export class CancelledError extends Error {
+  constructor() {
+    super("cancelled by user");
+    this.name = "CancelledError";
+  }
+}
+
+export function runClaude({ bin, prompt, cwd, timeoutMs, model, extraArgs = [], label, signal }) {
   const args = ["-p", prompt, "--output-format", "stream-json", "--verbose", ...extraArgs];
   if (model) args.push("--model", model);
 
@@ -22,11 +29,21 @@ export function runClaude({ bin, prompt, cwd, timeoutMs, model, extraArgs = [], 
     let result = null;
     let stderr = "";
     let timedOut = false;
+    let cancelled = false;
 
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill("SIGKILL");
     }, timeoutMs);
+
+    if (signal) {
+      const onAbort = () => {
+        cancelled = true;
+        child.kill("SIGKILL");
+      };
+      if (signal.aborted) onAbort();
+      else signal.addEventListener("abort", onAbort, { once: true });
+    }
 
     const handleEvent = (event) => {
       if (event.type === "result") {
@@ -64,6 +81,9 @@ export function runClaude({ bin, prompt, cwd, timeoutMs, model, extraArgs = [], 
     });
     child.on("close", (code) => {
       clearTimeout(timer);
+      if (cancelled) {
+        return reject(new CancelledError());
+      }
       if (timedOut) {
         return reject(new Error(`claude timed out after ${Math.round(timeoutMs / 60000)} min`));
       }

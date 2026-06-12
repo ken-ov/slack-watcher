@@ -1,10 +1,10 @@
 import path from "node:path";
 import fs from "node:fs";
-import { runClaude } from "../claude.js";
+import { runClaude, CancelledError } from "../claude.js";
 import { createWorktree, removeWorktree } from "../git.js";
 import { parsePrUrl } from "../github.js";
 import { log } from "../log.js";
-import { cancelledDuringGrace, minutes, threadTsOf, trim } from "./shared.js";
+import { cancelledDuringGrace, minutes, threadTsOf, trim, watchForStop } from "./shared.js";
 
 function reviewPrompt({ mention, contextBlock }, pr) {
   return `A teammate asked me to review a pull request. Review it and post inline comments under MY GitHub account.
@@ -56,7 +56,7 @@ export async function handlePrReview(ctx) {
     `:mag: *PR review picked up* — from @${mention.username ?? mention.user}\n` +
       `> ${pr.url}\n` +
       (config.workerGraceMs > 0
-        ? `• *Starting in ${minutes(config.workerGraceMs)} min* — reply \`stop\` here to cancel (review comments will be posted under YOUR GitHub account, and I'll reply in the Slack thread when done)\n`
+        ? `• *Starting in ${minutes(config.workerGraceMs)} min* — reply \`stop\` here to cancel, before OR while it runs (review comments will be posted under YOUR GitHub account, and I'll reply in the Slack thread when done)\n`
         : "") +
       `Original: ${mention.permalink ?? "n/a"}`,
   );
@@ -78,6 +78,9 @@ export async function handlePrReview(ctx) {
   log(`[review:${pr.repo}] reviewing PR #${pr.number} (timeout ${minutes(config.reviewTimeoutMs)} min)`);
   await slack.postToSelf(selfId, `:mag: *Reviewing now* — ${pr.url} (timeout ${minutes(config.reviewTimeoutMs)} min)`);
 
+  const controller = new AbortController();
+  const stopWatching = watchForStop(ctx, dmChannel, `review:${pr.repo}`, controller);
+
   let result;
   try {
     result = await runClaude({
@@ -87,8 +90,19 @@ export async function handlePrReview(ctx) {
       timeoutMs: config.reviewTimeoutMs,
       extraArgs: config.workerClaudeArgs,
       label: `review:${pr.repo}`,
+      signal: controller.signal,
     });
+  } catch (err) {
+    if (err instanceof CancelledError) {
+      await slack.postToSelf(
+        selfId,
+        `:no_entry: *Stopped* — killed the running review of ${pr.url} after ${minutes(Date.now() - startedAt)} min. If some comments were already posted, check the PR. ${mention.permalink ?? ""}`,
+      );
+      return { status: "cancelled_mid_task" };
+    }
+    throw err;
   } finally {
+    stopWatching();
     removeWorktree(repoPath, worktreePath);
     log(`[review:${pr.repo}] finished after ${minutes(Date.now() - startedAt)} min, worktree removed`);
   }

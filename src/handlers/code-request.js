@@ -1,9 +1,9 @@
 import path from "node:path";
 import fs from "node:fs";
-import { runClaude } from "../claude.js";
+import { runClaude, CancelledError } from "../claude.js";
 import { createWorktree, removeWorktree } from "../git.js";
 import { log } from "../log.js";
-import { cancelledDuringGrace, minutes, trim } from "./shared.js";
+import { cancelledDuringGrace, minutes, trim, watchForStop } from "./shared.js";
 
 const HEARTBEAT_MS = 5 * 60_000;
 
@@ -52,7 +52,7 @@ export async function handleCodeRequest(ctx) {
   const branchName = `auto/slack-${mention.ts.replace(".", "-")}`;
   const graceNote =
     config.workerGraceMs > 0
-      ? `• *Starting in ${minutes(config.workerGraceMs)} min* — reply \`stop\` here to cancel (e.g. if you're already on it)\n`
+      ? `• *Starting in ${minutes(config.workerGraceMs)} min* — reply \`stop\` here to cancel, before OR while it runs (e.g. if you're already on it)\n`
       : "";
 
   const dmChannel = await slack.postToSelf(
@@ -96,6 +96,9 @@ export async function handleCodeRequest(ctx) {
     HEARTBEAT_MS,
   );
 
+  const controller = new AbortController();
+  const stopWatching = watchForStop(ctx, dmChannel, classification.repo, controller);
+
   let result;
   try {
     result = await runClaude({
@@ -105,8 +108,19 @@ export async function handleCodeRequest(ctx) {
       timeoutMs: config.workerTimeoutMs,
       extraArgs: config.workerClaudeArgs,
       label: classification.repo,
+      signal: controller.signal,
     });
+  } catch (err) {
+    if (err instanceof CancelledError) {
+      await slack.postToSelf(
+        selfId,
+        `:no_entry: *Stopped* — killed the running worker for *${classification.repo}* after ${minutes(Date.now() - startedAt)} min. The worktree was discarded; if a branch/PR was already pushed, close it manually. ${mention.permalink ?? ""}`,
+      );
+      return { status: "cancelled_mid_task" };
+    }
+    throw err;
   } finally {
+    stopWatching();
     clearInterval(heartbeat);
     removeWorktree(repoPath, worktreePath);
     log(`[${classification.repo}] worker finished after ${minutes(Date.now() - startedAt)} min, worktree removed`);
