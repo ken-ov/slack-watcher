@@ -16,6 +16,7 @@ Built-in guardrails and quality-of-life:
 
 - **Near real-time without a server or admin rights** — polls Slack search with your own user token (default 45 s); no Slack app install to the workspace, runs on your machine via launchd (starts at login, auto-restarts).
 - **Reads the whole conversation** — pulls the thread or nearby messages, so requests split across several short messages are understood as one.
+- **Sees attachments** — downloads screenshots and small log/text files from the message (where bug reports usually live) and feeds them to the worker; the classifier only sees a cheap text marker, so vision cost is paid once, by the worker, only when files exist.
 - **Grace window + kill switch** — DMs you "starting in N min, reply `stop` to cancel" before doing anything; replying `stop` also works **while the worker runs** (checked every 20 s) and kills the Claude session immediately, discarding the worktree.
 - **Duplicate-work check** — scans open PRs, recent commits, and thread replies before writing code; never reviews its own or already-reviewed PRs.
 - **Your working copy is sacred** — workers only ever touch throwaway worktrees; drafts only; nothing public without the grace gate.
@@ -32,7 +33,7 @@ Built-in guardrails and quality-of-life:
 
 ## Setup
 
-1. **Slack token**: create an app at api.slack.com/apps → OAuth & Permissions → **User Token Scopes**: `search:read`, `chat:write` (required) + `channels:history`, `groups:history`, `im:history`, `mpim:history` (conversation context) + `users:read` (DM by username via `send.js`) → Install to Workspace → copy the **User OAuth Token**. Step-by-step guide with official links: [docs/slack-token-guide.md](docs/slack-token-guide.md).
+1. **Slack token**: create an app at api.slack.com/apps → OAuth & Permissions → **User Token Scopes**: `search:read`, `chat:write` (required) + `channels:history`, `groups:history`, `im:history`, `mpim:history` (conversation context) + `files:read` (read attached screenshots/logs) + `users:read` (DM by username via `send.js`) → Install to Workspace → copy the **User OAuth Token**. Step-by-step guide with official links: [docs/slack-token-guide.md](docs/slack-token-guide.md).
 2. ```bash
    cp .env.example .env   # set SLACK_USER_TOKEN, BASE_BRANCH, PR_SEARCH_QUERY, ...
    ```

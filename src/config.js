@@ -50,6 +50,7 @@ export function loadConfig() {
     answerTimeoutMs: intOption(env.ANSWER_TIMEOUT_MINUTES, 10, { min: 1 }) * 60_000,
     dryRun: env.DRY_RUN === "1" || env.DRY_RUN === "true",
     worktreesDir: path.join(BASE_DIR, "worktrees"),
+    attachmentsDir: path.join(BASE_DIR, "attachments"),
     stateFile: path.join(BASE_DIR, "state.json"),
     historyFile: path.join(BASE_DIR, "history.jsonl"),
     logDir: path.join(BASE_DIR, "logs"),

@@ -2,12 +2,13 @@ import path from "node:path";
 import fs from "node:fs";
 import { runClaude, CancelledError } from "../claude.js";
 import { createWorktree, removeWorktree } from "../git.js";
+import { prepareAttachments } from "../attachments.js";
 import { log } from "../log.js";
 import { cancelledDuringGrace, minutes, trim, watchForStop } from "./shared.js";
 
 const HEARTBEAT_MS = 5 * 60_000;
 
-function workerPrompt({ mention, classification, contextBlock, config }, branchName) {
+function workerPrompt({ mention, classification, contextBlock, config }, branchName, attachmentsBlock) {
   const base = config.baseBranch;
   return `A teammate asked for a code change on Slack. Implement it and open a draft PR.
 
@@ -16,7 +17,7 @@ Slack message (from @${mention.username ?? mention.user} in #${mention.channel?.
 ${mention.text}
 """
 Link: ${mention.permalink ?? "n/a"}
-${contextBlock}
+${contextBlock}${attachmentsBlock}
 Task summary: ${classification.summary}
 
 Mandatory workflow for this repository:
@@ -96,6 +97,13 @@ export async function handleCodeRequest(ctx) {
     HEARTBEAT_MS,
   );
 
+  const { block: attachmentsBlock } = await prepareAttachments({
+    files: mention.files,
+    token: config.slackToken,
+    destDir: worktreePath,
+    label: classification.repo,
+  });
+
   const controller = new AbortController();
   const stopWatching = watchForStop(ctx, dmChannel, classification.repo, controller);
 
@@ -103,7 +111,7 @@ export async function handleCodeRequest(ctx) {
   try {
     result = await runClaude({
       bin: config.claudeBin,
-      prompt: workerPrompt(ctx, branchName),
+      prompt: workerPrompt(ctx, branchName, attachmentsBlock),
       cwd: worktreePath,
       timeoutMs: config.workerTimeoutMs,
       extraArgs: config.workerClaudeArgs,

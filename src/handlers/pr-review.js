@@ -2,11 +2,12 @@ import path from "node:path";
 import fs from "node:fs";
 import { runClaude, CancelledError } from "../claude.js";
 import { createWorktree, removeWorktree } from "../git.js";
+import { prepareAttachments } from "../attachments.js";
 import { parsePrUrl } from "../github.js";
 import { log } from "../log.js";
 import { cancelledDuringGrace, minutes, threadTsOf, trim, watchForStop } from "./shared.js";
 
-function reviewPrompt({ mention, contextBlock }, pr) {
+function reviewPrompt({ mention, contextBlock }, pr, attachmentsBlock) {
   return `A teammate asked me to review a pull request. Review it and post inline comments under MY GitHub account.
 
 PR: ${pr.url} (repo ${pr.owner}/${pr.repo}, PR #${pr.number})
@@ -15,7 +16,7 @@ Slack message (from @${mention.username ?? mention.user} in #${mention.channel?.
 """
 ${mention.text}
 """
-${contextBlock}
+${contextBlock}${attachmentsBlock}
 Workflow:
 1. PRE-CHECK first: run \`gh api user --jq .login\` and \`gh pr view ${pr.number} --json author,state,isDraft,reviews,comments\`. STOP immediately and post nothing (REVIEW_COMMENTS: 0, explain in SLACK_REPLY) if ANY of these holds:
    - the PR author is me (never review my own PR),
@@ -78,6 +79,13 @@ export async function handlePrReview(ctx) {
   log(`[review:${pr.repo}] reviewing PR #${pr.number} (timeout ${minutes(config.reviewTimeoutMs)} min)`);
   await slack.postToSelf(selfId, `:mag: *Reviewing now* — ${pr.url} (timeout ${minutes(config.reviewTimeoutMs)} min)`);
 
+  const { block: attachmentsBlock } = await prepareAttachments({
+    files: mention.files,
+    token: config.slackToken,
+    destDir: worktreePath,
+    label: `review:${pr.repo}`,
+  });
+
   const controller = new AbortController();
   const stopWatching = watchForStop(ctx, dmChannel, `review:${pr.repo}`, controller);
 
@@ -85,7 +93,7 @@ export async function handlePrReview(ctx) {
   try {
     result = await runClaude({
       bin: config.claudeBin,
-      prompt: reviewPrompt(ctx, pr),
+      prompt: reviewPrompt(ctx, pr, attachmentsBlock),
       cwd: worktreePath,
       timeoutMs: config.reviewTimeoutMs,
       extraArgs: config.workerClaudeArgs,

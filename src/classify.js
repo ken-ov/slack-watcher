@@ -1,5 +1,6 @@
 import { runClaude, extractJson } from "./claude.js";
 import { buildRepoHints } from "./repos.js";
+import { describeAttachments } from "./attachments.js";
 import { PR_URL_RE } from "./github.js";
 
 const VALID_KINDS = new Set(["code_request", "pr_review", "question", "needs_clarification", "ignore"]);
@@ -19,7 +20,7 @@ Slack message (from @${mention.username ?? mention.user} in #${mention.channel?.
 """
 ${mention.text}
 """
-${contextBlock}
+${describeAttachments(mention.files)}${contextBlock}
 Classify the REQUEST AS A WHOLE — the mention plus the requester's surrounding messages in the context block. A bare mention whose details appear in adjacent messages is a complete request, not needs_clarification.
 
 Classify it:
