@@ -115,6 +115,7 @@ export async function handleCodeRequest(ctx) {
       cwd: worktreePath,
       timeoutMs: config.workerTimeoutMs,
       extraArgs: config.workerClaudeArgs,
+      model: config.workerModel,
       label: classification.repo,
       signal: controller.signal,
     });

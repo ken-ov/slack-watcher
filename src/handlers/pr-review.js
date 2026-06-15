@@ -97,6 +97,7 @@ export async function handlePrReview(ctx) {
       cwd: worktreePath,
       timeoutMs: config.reviewTimeoutMs,
       extraArgs: config.workerClaudeArgs,
+      model: config.workerModel,
       label: `review:${pr.repo}`,
       signal: controller.signal,
     });

@@ -49,10 +49,15 @@ export function runClaude({ bin, prompt, cwd, timeoutMs, model, extraArgs = [], 
       if (event.type === "result") {
         // The result event is final — settle NOW instead of waiting for process
         // close, which can lag minutes if the worker left children holding the pipe.
-        result = event.result ?? "";
         clearTimeout(timer);
-        resolve(result);
         child.kill();
+        if (event.is_error || event.subtype !== "success") {
+          // e.g. inaccessible model, auth failure — surface as a real error, not a parseable result.
+          const reason = event.subtype && event.subtype !== "success" ? event.subtype : "error";
+          return reject(new Error(`claude failed (${reason}): ${(event.result ?? "").slice(0, 300)}`));
+        }
+        result = event.result ?? "";
+        resolve(result);
         return;
       }
       if (!label || event.type !== "assistant") return;

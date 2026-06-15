@@ -37,6 +37,7 @@ export async function handleQuestion(ctx) {
       prompt: answerPrompt(ctx, attachmentsBlock),
       cwd: config.reposRoot,
       timeoutMs: config.answerTimeoutMs,
+      model: config.workerModel,
       label: "question",
     });
   } finally {

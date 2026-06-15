@@ -40,6 +40,7 @@ export function loadConfig() {
     docsContextDir: env.DOCS_CONTEXT_DIR || "",
     claudeBin: env.CLAUDE_BIN || "claude",
     classifierModel: env.CLASSIFIER_MODEL || "haiku",
+    workerModel: env.WORKER_MODEL || "sonnet",
     workerClaudeArgs: (env.WORKER_CLAUDE_ARGS ?? "--dangerously-skip-permissions")
       .split(" ")
       .filter(Boolean),
