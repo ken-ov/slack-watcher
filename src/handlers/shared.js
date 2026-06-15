@@ -58,10 +58,11 @@ export async function cancelledDuringGrace(ctx, dmChannel, label) {
   }
 
   // The user may have answered the thread themselves instead of typing "stop".
+  // Thread-only: a stray channel message must not count as handling the request.
   const context = await slack.fetchContext(mention, ctx.config.contextWindowSeconds);
-  const replied = context.messages.some(
-    (m) => m.user === selfId && Number.parseFloat(m.ts) > Number.parseFloat(mention.ts),
-  );
+  const replied =
+    context.kind === "thread" &&
+    context.messages.some((m) => m.user === selfId && Number.parseFloat(m.ts) > Number.parseFloat(mention.ts));
   if (replied) {
     log(`[${label}] cancelled — you already replied in the conversation`);
     await slack.postToSelf(

@@ -32,8 +32,13 @@ function mergeMatches(mentionMatches, prMatches) {
   return [...merged.values()];
 }
 
-/** True when the user already posted something in the conversation after the mention — they handled it themselves. */
+/**
+ * True when the user already replied in the SAME thread after the mention — they handled it.
+ * Only applied to threads: in a non-threaded channel, an unrelated nearby message from the
+ * user would otherwise cause a false skip.
+ */
 function userAlreadyReplied(context, mention, selfId) {
+  if (context.kind !== "thread") return false;
   return context.messages.some(
     (m) => m.user === selfId && Number.parseFloat(m.ts) > Number.parseFloat(mention.ts),
   );

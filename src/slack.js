@@ -86,9 +86,10 @@ export function createSlackClient(token) {
      */
     async fetchContext(match, windowSeconds = 900) {
       const channelId = match.channel?.id;
-      if (!channelId) return { messages: [], error: "no channel id" };
+      if (!channelId) return { messages: [], error: "no channel id", kind: "none" };
       try {
         const threadTs = match.permalink?.match(/thread_ts=(\d+\.\d+)/)?.[1];
+        const kind = threadTs ? "thread" : "channel";
         let messages;
         if (threadTs) {
           const body = await call(
@@ -119,9 +120,10 @@ export function createSlackClient(token) {
             .filter((m) => (m.type === "message" || !m.type) && m.text)
             .map((m) => ({ user: m.user, ts: m.ts, text: m.text.slice(0, 500) })),
           error: null,
+          kind,
         };
       } catch (err) {
-        return { messages: [], error: err.message };
+        return { messages: [], error: err.message, kind: "none" };
       }
     },
 
