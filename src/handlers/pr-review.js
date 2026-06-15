@@ -120,9 +120,12 @@ export async function handlePrReview(ctx) {
   const slackReply = result.match(/SLACK_REPLY:\s*([\s\S]+)$/m)?.[1]?.trim() ?? "";
   log(`[review:${pr.repo}] result: ${Number.isNaN(commentCount) ? "unparseable" : `${commentCount} comment(s)`}`);
 
+  // Reply in the thread either way: the drafted line when comments were posted,
+  // or "LGTM!" when the PR is clean. (No reply only if the result was unparseable.)
   let repliedInThread = false;
-  if (commentCount > 0 && slackReply && mention.channel?.id) {
-    await slack.replyInThread(mention.channel.id, threadTsOf(mention), slackReply);
+  if (!Number.isNaN(commentCount) && mention.channel?.id) {
+    const threadReply = commentCount > 0 ? slackReply || "I added some review comments on the PR." : "LGTM!";
+    await slack.replyInThread(mention.channel.id, threadTsOf(mention), threadReply);
     repliedInThread = true;
   }
 
@@ -133,8 +136,9 @@ export async function handlePrReview(ctx) {
         ? `:warning: PR review finished but I couldn't parse the result for ${pr.url} — check the PR manually.\n\nWorker output:\n${result}`
         : commentCount > 0
           ? `:white_check_mark: *PR review done* — posted ${commentCount} inline comment(s) on ${pr.url}` +
-            (repliedInThread ? `\nReplied in the Slack thread: "${slackReply}"` : "\n:warning: Could not reply in the Slack thread — do it manually.")
-          : `:white_check_mark: *PR review done* — no real issues found on ${pr.url}. Nothing posted; reply to the thread yourself if you want (draft: "${slackReply}")`,
+            (repliedInThread ? `\nReplied in the Slack thread.` : "\n:warning: Could not reply in the Slack thread — do it manually.")
+          : `:white_check_mark: *PR review done* — no real issues found on ${pr.url}.` +
+            (repliedInThread ? ` Replied *LGTM!* in the Slack thread.` : ` (couldn't reply in the thread — do it manually.)`),
     ),
   );
   return { status: "reviewed", comments: Number.isNaN(commentCount) ? null : commentCount, repliedInThread };
