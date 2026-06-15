@@ -41,6 +41,7 @@ export function loadConfig() {
     claudeBin: env.CLAUDE_BIN || "claude",
     classifierModel: env.CLASSIFIER_MODEL || "haiku",
     workerModel: env.WORKER_MODEL || "sonnet",
+    reviewModel: env.REVIEW_MODEL || "opus",
     workerClaudeArgs: (env.WORKER_CLAUDE_ARGS ?? "--dangerously-skip-permissions")
       .split(" ")
       .filter(Boolean),
